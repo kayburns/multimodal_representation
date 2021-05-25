@@ -21,6 +21,7 @@ from utils import (
 
 from dataloaders import ProcessForce, ToTensor
 from dataloaders import MultimodalManipulationDataset
+from dataloaders import TactoManipulationDataset
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 from torchvision import transforms
@@ -105,7 +106,7 @@ class selfsupervised:
         self._init_dataloaders()
 
     def train(self):
-
+        import pdb; pdb.set_trace()
         for i_epoch in tqdm(range(self.configs["max_epoch"])):
             # ---------------------------
             # Train Step
@@ -113,7 +114,7 @@ class selfsupervised:
             self.logger.print("Training epoch #{}...".format(i_epoch))
             self.model.train()
 
-            for i_iter, sample_batched in tqdm(enumerate(self.dataloaders["val"])):
+            for i_iter, sample_batched in tqdm(enumerate(self.dataloaders["val"])): #TODO: why is this val??????
 
                 t_st = time.time()
                 self.optimizer.zero_grad()
@@ -203,7 +204,8 @@ class selfsupervised:
 
         # input data
         image = self.alpha_vision * sampled_batched["image"].to(self.device)
-        force = self.alpha_force * sampled_batched["force"].to(self.device)
+        #TODO add tacto
+        # force = self.alpha_force * sampled_batched["force"].to(self.device)
         proprio = self.alpha_proprio * sampled_batched["proprio"].to(self.device)
         depth = self.alpha_depth * sampled_batched["depth"].to(self.device).transpose(
             1, 3
@@ -211,17 +213,19 @@ class selfsupervised:
 
         action = sampled_batched["action"].to(self.device)
 
-        contact_label = sampled_batched["contact_next"].to(self.device)
-        optical_flow_label = sampled_batched["flow"].to(self.device)
-        optical_flow_mask_label = sampled_batched["flow_mask"].to(self.device)
+        # TODO
+        # contact_label = sampled_batched["contact_next"].to(self.device)
+        # optical_flow_label = sampled_batched["flow"].to(self.device)
+        # optical_flow_mask_label = sampled_batched["flow_mask"].to(self.device)
 
         # unpaired data for sampled point
         unpaired_image = self.alpha_vision * sampled_batched["unpaired_image"].to(
             self.device
         )
-        unpaired_force = self.alpha_force * sampled_batched["unpaired_force"].to(
-            self.device
-        )
+        #TODO add tacto
+        # unpaired_force = self.alpha_force * sampled_batched["unpaired_force"].to(
+        #     self.device
+        # )
         unpaired_proprio = self.alpha_proprio * sampled_batched["unpaired_proprio"].to(
             self.device
         )
@@ -230,8 +234,10 @@ class selfsupervised:
         ).transpose(1, 3).transpose(2, 3)
 
         # labels to predict
-        gt_ee_pos_delta = sampled_batched["ee_yaw_next"].to(self.device)
+        # TODO
+        # gt_ee_pos_delta = sampled_batched["ee_yaw_next"].to(self.device)
 
+        # TODO ______________________________________________________
         if self.deterministic:
             paired_out, contact_out, flow2, optical_flow2_mask, ee_delta_out, mm_feat = self.model(
                 image, force, proprio, depth, action
@@ -350,8 +356,8 @@ class selfsupervised:
 
         filename_list = []
         for file in os.listdir(self.configs["dataset"]):
-            if file.endswith(".h5"):
-                filename_list.append(self.configs["dataset"] + file)
+            # if file.endswith(".h5"):
+            filename_list.append(os.path.join(self.configs["dataset"], file))
 
         self.logger.print(
             "Number of files in multifile dataset = {}".format(len(filename_list))
@@ -373,9 +379,11 @@ class selfsupervised:
 
         self.logger.print("Initial finished")
 
-        val_filename_list1, filename_list1 = augment_val(
-            val_filename_list, filename_list
-        )
+        print("WARNING: augmentation removed")
+        val_filename_list1, filename_list1 = val_filename_list, filename_list
+        # val_filename_list1, filename_list1 = augment_val(
+        #     val_filename_list, filename_list
+        # )
 
         self.logger.print("Listing finished")
 
@@ -384,39 +392,39 @@ class selfsupervised:
         self.datasets = {}
 
         self.samplers["val"] = SubsetRandomSampler(
-            range(len(val_filename_list1) * (self.configs["ep_length"] - 1))
+            range(len(val_filename_list1))
         )
         self.samplers["train"] = SubsetRandomSampler(
-            range(len(filename_list1) * (self.configs["ep_length"] - 1))
+            range(len(filename_list1))
         )
 
         self.logger.print("Sampler finished")
 
-        self.datasets["train"] = MultimodalManipulationDataset(
+        self.datasets["train"] = TactoManipulationDataset(
             filename_list1,
             transform=transforms.Compose(
                 [
-                    ProcessForce(32, "force", tanh=True),
-                    ProcessForce(32, "unpaired_force", tanh=True),
+                    # ProcessForce(32, "force", tanh=True),
+                    # ProcessForce(32, "unpaired_force", tanh=True),
                     ToTensor(device=self.device),
                 ]
             ),
-            episode_length=self.configs["ep_length"],
+            # episode_length=self.configs["ep_length"],
             training_type=self.configs["training_type"],
             action_dim=self.configs["action_dim"],
 
         )
 
-        self.datasets["val"] = MultimodalManipulationDataset(
+        self.datasets["val"] = TactoManipulationDataset(
             val_filename_list1,
             transform=transforms.Compose(
                 [
-                    ProcessForce(32, "force", tanh=True),
-                    ProcessForce(32, "unpaired_force", tanh=True),
+                    # ProcessForce(32, "force", tanh=True),
+                    # ProcessForce(32, "unpaired_force", tanh=True),
                     ToTensor(device=self.device),
                 ]
             ),
-            episode_length=self.configs["ep_length"],
+            # episode_length=self.configs["ep_length"],
             training_type=self.configs["training_type"],
             action_dim=self.configs["action_dim"],
 
